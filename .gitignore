@@ -1,0 +1,18 @@
+# Private runtime data and build products must never be committed.
+local-data/
+.venv/
+.build-venv/
+__pycache__/
+*.pyc
+build/
+dist/
+*.spec
+settings.json
+settings.backup.json
+appearance.json
+runtime.json
+startup-events*.jsonl
+browser-profiles/
+updates/
+*.private
+*signing-key*PRIVATE*
