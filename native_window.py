@@ -11,16 +11,28 @@ def run(resources, status, open_panel, shutdown, finished, focus_requested, back
     except (AttributeError,OSError):pass
     root=tk.Tk();root.title(TITLE);root.geometry('500x440');root.minsize(480,420)
     current_image=[None]
+    native_icons=None
+    if sys.platform=='win32':
+        try:
+            from windows_icons import WindowIcons
+            native_icons=WindowIcons(root)
+        except (AttributeError,OSError):pass
+    active_icon=[None]
+    def refresh_icon():
+        if native_icons and active_icon[0]:
+            try:native_icons.apply(active_icon[0])
+            except (AttributeError,OSError,ValueError,TypeError):pass
     style=ttk.Style(root);style.theme_use('clam')
     def apply_theme(value):
         dark=value=='dark';bg='#202020' if dark else '#F7F6F3';fg='#F3F2EF' if dark else '#252724';sub='#B7B5AF' if dark else '#666A63';button='#383838' if dark else '#FFFFFF';border='#595959' if dark else '#D2D4CE'
         root.configure(bg=bg)
         suffix='-dark' if dark else ''
         if sys.platform=='win32':
-            # A single large PhotoImage replaces the multi-resolution ICO.
-            # Keep the ICO, so Windows can choose a taskbar-sized image.
-            try: root.iconbitmap(str(Path(resources)/('app-icon'+suffix+'.ico')))
+            active_icon[0]=str(Path(resources)/('app-icon'+suffix+'.ico'))
+            # Tk remains a fallback; install the DPI-sized Windows HICON afterwards.
+            try: root.iconbitmap(active_icon[0])
             except tk.TclError: pass
+            refresh_icon()
         else:
             try:
                 current_image[0]=tk.PhotoImage(file=str(Path(resources)/('app-icon'+suffix+'.png')))
@@ -59,6 +71,16 @@ def run(resources, status, open_panel, shutdown, finished, focus_requested, back
     quit_button=ttk.Button(frame,text='Завершить всё',style='Quit.TButton',command=close_all);quit_button.pack(fill='x',pady=(0,16))
     ttk.Label(frame,text='Сворачивание и закрытие страницы не останавливают программу. Крестик этого окна — завершить всё.',wraplength=420,style='Sub.TLabel').pack(anchor='w',fill='x')
     root.protocol('WM_DELETE_WINDOW',close_all)
+    if native_icons:
+        # Recheck on window moves/resizes, including monitor-DPI changes.
+        pending=[False]
+        def on_configure(event):
+            if event.widget is root and not pending[0]:
+                pending[0]=True
+                def refresh():
+                    pending[0]=False;refresh_icon()
+                root.after_idle(refresh)
+        root.bind('<Configure>',on_configure,add='+')
     def tick():
         if finished():root.destroy();return
         sync_theme()
@@ -67,4 +89,8 @@ def run(resources, status, open_panel, shutdown, finished, focus_requested, back
         root.after(250,tick)
     root.after(250,tick)
     if background:root.after(100,root.iconify)
-    root.mainloop()
+    try:root.mainloop()
+    finally:
+        try:root.destroy()
+        except tk.TclError:pass
+        if native_icons:native_icons.close()
