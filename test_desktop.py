@@ -75,6 +75,19 @@ class NativeContractTests(unittest.TestCase):
         buttons[1]['command']();buttons[1]['command']();shutdown.assert_called_once()
         root.protocol.assert_called_once()
 
+class TaskbarIconTests(unittest.TestCase):
+    def test_windows_retains_multiresolution_icon_and_switches_theme(self):
+        tk=types.ModuleType('tkinter');ttk=types.ModuleType('tkinter.ttk');messagebox=types.ModuleType('tkinter.messagebox')
+        root=MagicMock();tk.Tk=MagicMock(return_value=root);tk.StringVar=MagicMock();tk.PhotoImage=MagicMock();tk.TclError=RuntimeError
+        ttk.Style=MagicMock();ttk.Frame=MagicMock();ttk.Label=MagicMock();ttk.Button=MagicMock()
+        tk.ttk=ttk;tk.messagebox=messagebox;selected=['light']
+        with patch.dict(sys.modules,{'tkinter':tk,'tkinter.ttk':ttk,'tkinter.messagebox':messagebox}),patch('ctypes.windll',create=True),patch('sys.platform','win32'):
+            native_window.run(Path('/qa'),lambda:'OK',MagicMock(),MagicMock(),lambda:False,lambda:False,theme=lambda:selected[0])
+            self.assertTrue(str(root.iconbitmap.call_args.args[0]).endswith('app-icon.ico'))
+            selected[0]='dark';root.after.call_args.args[1]()
+            self.assertTrue(str(root.iconbitmap.call_args.args[0]).endswith('app-icon-dark.ico'))
+            root.iconphoto.assert_not_called();tk.PhotoImage.assert_not_called()
+
 class ShortcutTests(unittest.TestCase):
     def test_quote_unicode_and_frozen_icon_is_not_temporary(self):
         with tempfile.TemporaryDirectory() as td:
