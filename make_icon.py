@@ -6,6 +6,20 @@ BASE=Path(__file__).resolve().parent
 VARIANTS={'':('#294F47','#FFFFFF','#A8D2C0'),'-dark':('#4A4D4B','#FAFAF8','#C8CECA')}
 
 def render(background,foreground,accent,size=512):
+    # Hint the small frames to the pixel grid. Fine text-like details in a
+    # downsampled 512px picture otherwise turn into blurry grey pixels.
+    if size <= 48:
+        im=Image.new('RGBA',(size,size),(0,0,0,0));d=ImageDraw.Draw(im)
+        k=lambda v:round(v*size/32)
+        d.rounded_rectangle((k(1),k(1),k(31)-1,k(31)-1),radius=max(2,k(7)),fill=background)
+        d.rounded_rectangle((k(6),k(5),k(22),k(27)),radius=max(1,k(2)),fill=foreground)
+        stroke=max(1,round(size/32))
+        for y,end in [(10,19),(14,18),(18,15)]:
+            d.rectangle((k(9),k(y),k(end),k(y)+stroke-1),fill=background)
+        d.ellipse((k(19),k(18),k(29),k(28)),fill=background)
+        d.ellipse((k(20),k(19),k(28),k(27)),fill=accent)
+        d.polygon([(k(23),k(21)),(k(23),k(25)),(k(26),k(23))],fill=background)
+        return im
     factor=4; im=Image.new('RGBA',(256*factor,256*factor),(0,0,0,0)); d=ImageDraw.Draw(im)
     def box(coords):return tuple(int(x*factor) for x in coords)
     d.rounded_rectangle(box((10,10,246,246)),radius=52*factor,fill=background)
