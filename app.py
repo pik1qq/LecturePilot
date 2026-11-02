@@ -680,6 +680,9 @@ def notify_existing(url):
 
 
 def main():
+    if sys.platform=='win32':
+        from windows_icons import enable_dpi_awareness
+        enable_dpi_awareness()
     global PANEL_URL
     guard = instance_lock()
     if guard is None:
