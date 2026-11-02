@@ -93,19 +93,52 @@ class ShortcutTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             folder=Path(td);target=folder/'LecturePilot.exe';target.touch()
             paths=[folder/'Рабочий стол'/shortcuts.NAME,folder/'Пуск'/shortcuts.NAME]
+            resources=folder/'resources';resources.mkdir();(resources/'app-icon.ico').write_bytes(b'icon');(resources/'app-icon-dark.ico').write_bytes(b'dark')
             scripts=[]
             def run(args,**kw):
                 scripts.append(base64.b64decode(args[-1]).decode('utf-16le'))
                 for path in paths:path.touch()
                 return types.SimpleNamespace(returncode=0)
             with patch.object(shortcuts,'launch_target',return_value=(target,'')),patch.object(shortcuts,'shortcut_paths',return_value=paths),patch.object(sys,'frozen',True,create=True),patch('windows_shortcuts.subprocess.run',side_effect=run):
-                self.assertEqual(len(shortcuts.create('/temporary/MEIPASS')),2)
-            self.assertIn('by pik1',scripts[0]);self.assertIn(str(target)+',0',scripts[0]);self.assertNotIn('MEIPASS',scripts[0])
+                self.assertEqual(len(shortcuts.create(resources,folder/'data','dark','1.8.1')),2)
+            self.assertIn('by pik1',scripts[0]);self.assertIn('LecturePilot-1.8.1-dark.ico,0',scripts[0]);self.assertNotIn(str(resources),scripts[0]);self.assertEqual((folder/'data'/'icons'/'LecturePilot-1.8.1-dark.ico').read_bytes(),b'dark')
             self.assertEqual(shortcuts.ps_literal("O'Brien"),"'O''Brien'")
+    def test_auto_sync_checks_identity_and_does_not_create_shortcuts(self):
+        with tempfile.TemporaryDirectory() as td:
+            folder=Path(td);target=folder/'app.exe';target.touch();(folder/'app-icon-dark.ico').write_bytes(b'dark')
+            existing=folder/'existing.lnk';existing.touch();missing=folder/'missing.lnk';scripts=[]
+            def run(args,**kw):
+                scripts.append(base64.b64decode(args[-1]).decode('utf-16le'))
+                return types.SimpleNamespace(returncode=0)
+            with patch.object(shortcuts,'launch_target',return_value=(target,'')),patch.object(shortcuts,'shortcut_paths',return_value=[existing,missing]),patch('windows_shortcuts.subprocess.run',side_effect=run):
+                shortcuts.update_existing(folder,folder/'data','dark','1.8.1')
+            self.assertIn('OrdinalIgnoreCase',scripts[0]);self.assertIn('$s.Description -eq',scripts[0]);self.assertNotIn(str(missing),scripts[0]);self.assertFalse(missing.exists())
+
     def test_shell_failure_not_reported_as_success(self):
         with tempfile.TemporaryDirectory() as td:
-            target=Path(td)/'app.exe';target.touch()
+            target=Path(td)/'app.exe';target.touch();(Path(td)/'app-icon.ico').write_bytes(b'icon')
             with patch.object(shortcuts,'launch_target',return_value=(target,'')),patch.object(shortcuts,'shortcut_paths',return_value=[Path(td)/'bad.lnk']),patch('windows_shortcuts.subprocess.run',return_value=types.SimpleNamespace(returncode=1)):
-                with self.assertRaises(ValueError):shortcuts.create(td)
+                with self.assertRaises(ValueError):shortcuts.create(td,td,'light','1.8.1')
+
+@unittest.skipUnless(sys.platform=='win32','requires Windows WScript.Shell')
+class RealWindowsShortcutTests(unittest.TestCase):
+    def test_shortcut_uses_stable_theme_icon_and_preserves_unrelated_link(self):
+        import subprocess
+        with tempfile.TemporaryDirectory() as td:
+            folder=Path(td);target=folder/'LecturePilot.exe';target.touch()
+            (folder/'app-icon.ico').write_bytes(b'light-icon');(folder/'app-icon-dark.ico').write_bytes(b'dark-icon')
+            paths=[folder/'Desktop'/shortcuts.NAME,folder/'Start'/shortcuts.NAME]
+            with patch.object(shortcuts,'launch_target',return_value=(target,'')),patch.object(shortcuts,'shortcut_paths',return_value=paths):
+                shortcuts.create(folder,folder/'data','light','1.8.1')
+                shortcuts.update_existing(folder,folder/'data','dark','1.8.1')
+                get="$s=(New-Object -ComObject WScript.Shell).CreateShortcut("+shortcuts.ps_literal(paths[0])+"); Write-Output $s.IconLocation"
+                encoded=base64.b64encode(get.encode('utf-16le')).decode('ascii')
+                result=subprocess.run(['powershell.exe','-NoProfile','-EncodedCommand',encoded],capture_output=True,text=True,encoding='utf-8',check=True)
+                self.assertIn('LecturePilot-1.8.1-dark.ico,0',result.stdout)
+                change="$s=(New-Object -ComObject WScript.Shell).CreateShortcut("+shortcuts.ps_literal(paths[0])+");$s.Description='Unrelated';$s.Save()"
+                shortcuts._powershell(change)
+                shortcuts.update_existing(folder,folder/'data','light','1.8.1')
+                result=subprocess.run(['powershell.exe','-NoProfile','-EncodedCommand',encoded],capture_output=True,text=True,encoding='utf-8',check=True)
+                self.assertIn('LecturePilot-1.8.1-dark.ico,0',result.stdout)
 
 if __name__=='__main__':unittest.main()
