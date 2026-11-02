@@ -27,6 +27,8 @@ jobs:
         run: |
           $version = python -c "import updater; print(updater.VERSION)"
           if ($version -ne $env:REQUESTED_VERSION) { throw "Version does not match updater.py" }
+      - name: Install test browser
+        run: python -m playwright install chromium --only-shell
       - name: Run unit tests
         shell: pwsh
         env:
