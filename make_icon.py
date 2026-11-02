@@ -1,0 +1,29 @@
+"""Create crisp, multi-resolution vector-inspired light/dark application marks."""
+from pathlib import Path
+from PIL import Image,ImageDraw
+BASE=Path(__file__).resolve().parent
+# A single page/route mark: simple enough to remain legible on a 16px taskbar.
+VARIANTS={'':('#294F47','#FFFFFF','#A8D2C0'),'-dark':('#4A4D4B','#FAFAF8','#C8CECA')}
+
+def render(background,foreground,accent):
+    factor=4; im=Image.new('RGBA',(256*factor,256*factor),(0,0,0,0)); d=ImageDraw.Draw(im)
+    def box(coords):return tuple(int(x*factor) for x in coords)
+    d.rounded_rectangle(box((10,10,246,246)),radius=52*factor,fill=background)
+    # Broad page silhouette; three robust lines retain their shape at taskbar size.
+    d.rounded_rectangle(box((55,52,171,204)),radius=13*factor,fill=foreground)
+    for y,width in [(79,75),(104,64),(129,49)]:
+        d.rounded_rectangle(box((74,y,74+width,y+9)),radius=4*factor,fill=background)
+    # Distinct forward arrow represents the pilot, not a tiny detailed logo.
+    d.ellipse(box((140,134,214,208)),fill=background)
+    d.ellipse(box((148,142,206,200)),fill=accent)
+    d.polygon([(170*factor,155*factor),(170*factor,188*factor),(192*factor,171*factor)],fill=background)
+    return im.resize((512,512),Image.Resampling.LANCZOS)
+
+def svg(background,foreground,accent):
+    return f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256"><rect x="10" y="10" width="236" height="236" rx="52" fill="{background}"/><rect x="55" y="52" width="116" height="152" rx="13" fill="{foreground}"/><path d="M78 84h67M78 109h56M78 134h41" fill="none" stroke="{background}" stroke-width="9" stroke-linecap="round"/><circle cx="177" cy="171" r="37" fill="{background}"/><circle cx="177" cy="171" r="29" fill="{accent}"/><path d="M170 155v33l22-17z" fill="{background}"/></svg>'''
+for suffix,(bg,fg,accent) in VARIANTS.items():
+    im=render(bg,fg,accent)
+    im.save(BASE/('app-icon'+suffix+'.png'))
+    im.save(BASE/('app-icon'+suffix+'.ico'),format='ICO',sizes=[(16,16),(24,24),(32,32),(48,48),(64,64),(128,128),(256,256)])
+    (BASE/('app-icon'+suffix+'.svg')).write_text(svg(bg,fg,accent),encoding='utf-8')
+print('Generated light/dark SVG, PNG and multi-resolution Windows ICO icons.')
