@@ -67,7 +67,7 @@ class NativeContractTests(unittest.TestCase):
             buttons.append(kwargs);return MagicMock()
         ttk.Button=button;messagebox.askyesno=MagicMock(return_value=True)
         tk.ttk=ttk;tk.messagebox=messagebox;opening=MagicMock();shutdown=MagicMock()
-        with patch.dict(sys.modules,{'tkinter':tk,'tkinter.ttk':ttk,'tkinter.messagebox':messagebox}):
+        with patch.dict(sys.modules,{'tkinter':tk,'tkinter.ttk':ttk,'tkinter.messagebox':messagebox}),patch('ctypes.windll',create=True):
             native_window.run(Path('/qa'),lambda:'Тест',opening,shutdown,lambda:False,lambda:False)
         root.title.assert_called_once_with('Lecture Pilot by pik1')
         self.assertEqual([b['text'] for b in buttons],['Открыть панель','Завершить всё'])
