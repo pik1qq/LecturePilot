@@ -5,7 +5,7 @@ from urllib.request import Request, urlopen, build_opener, HTTPSHandler, HTTPRed
 from urllib.parse import urlparse
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
-VERSION='1.8.0'
+VERSION='1.8.1'
 REPO='https://github.com/pik1qq/LecturePilot'
 ALLOWED={'github.com','objects.githubusercontent.com','release-assets.githubusercontent.com','github-releases.githubusercontent.com'}
 MAX_SIZE=150_000_000
