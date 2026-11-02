@@ -65,8 +65,10 @@ def update_existing(resources,data_dir,theme,version):
     if not target.is_file():return
     icon=str(persistent_icon(resources,data_dir,theme,version))+',0'
     script="$ErrorActionPreference='Stop'; $ws=New-Object -ComObject WScript.Shell;\n"
+    # WScript.Shell may return 8.3 paths (e.g. RUNNER~1); expand both sides.
+    script+="Add-Type -TypeDefinition 'using System; using System.Text; using System.Runtime.InteropServices; public static class LPPaths { [DllImport(\"kernel32.dll\", CharSet=CharSet.Unicode, SetLastError=true)] static extern uint GetLongPathName(string p, StringBuilder b, uint n); public static string Long(string p) { var b=new StringBuilder(32768); return GetLongPathName(p,b,(uint)b.Capacity)>0 ? b.ToString() : p; } }';\n"
     for path in paths:
         script+='$s=$ws.CreateShortcut('+ps_literal(path)+');'
-        script+='if ([string]::Equals($s.TargetPath,'+ps_literal(target)+',[StringComparison]::OrdinalIgnoreCase) -and $s.Arguments -eq '+ps_literal(args)+' -and $s.Description -eq '+ps_literal(DESCRIPTION)+') {'
+        script+='if ([string]::Equals([LPPaths]::Long($s.TargetPath),[LPPaths]::Long('+ps_literal(target)+'),[StringComparison]::OrdinalIgnoreCase) -and $s.Arguments -eq '+ps_literal(args)+' -and $s.Description -eq '+ps_literal(DESCRIPTION)+') {'
         script+='$s.IconLocation='+ps_literal(icon)+';$s.Save()};\n'
     _powershell(script)
