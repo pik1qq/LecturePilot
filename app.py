@@ -526,13 +526,16 @@ class Handler(BaseHTTPRequestHandler):
                 with LOCK:
                     atomic_write(BASE/'appearance.json',json.dumps({'theme':theme}))
                     state['theme']=theme
+                threading.Thread(target=sync_shortcut_icons,daemon=True).start()
             elif self.path == '/api/open-panel':
                 FOCUS_NATIVE.set()
                 OPEN_PANEL.set()
                 WAKE.set()
             elif self.path == '/api/shortcuts':
                 from windows_shortcuts import create
-                create(RESOURCES)
+                with SHORTCUT_LOCK:
+                    with LOCK:theme=state.get('theme','light')
+                    create(RESOURCES,BASE,theme,updater.VERSION)
                 log('Созданы ярлыки Lecture Pilot by pik1 на рабочем столе и в меню «Пуск».')
             elif self.path == '/api/save':
                 clean = validate_settings(data)
@@ -653,6 +656,16 @@ def request_shutdown(server):
     threading.Thread(target=server.shutdown,daemon=True).start()
 
 
+SHORTCUT_LOCK = threading.Lock()
+def sync_shortcut_icons():
+    if os.name != 'nt':return
+    try:
+        from windows_shortcuts import update_existing
+        with SHORTCUT_LOCK:
+            with LOCK:theme=state.get('theme','light')
+            update_existing(RESOURCES,BASE,theme,updater.VERSION)
+    except Exception as error:log('Не удалось обновить значок ярлыка: '+str(error)[:160])
+
 def notify_existing(url):
     import re
     parsed=urlsplit(url)
@@ -698,6 +711,7 @@ def main():
     threading.Thread(target=refreshing_loop,daemon=True).start()
     threading.Thread(target=clean_old_helper,daemon=True).start()
     threading.Thread(target=update_loop,daemon=True).start()
+    threading.Thread(target=sync_shortcut_icons,daemon=True).start()
     print('Lecture Pilot by pik1 — '+PANEL_URL,flush=True)
     if os.environ.get('LECTURE_PILOT_NO_OPEN')!='1' and '--background' not in sys.argv:
         OPEN_PANEL.set();WAKE.set()
