@@ -5,25 +5,27 @@ def run(resources, status, open_panel, shutdown, finished, focus_requested, back
     import tkinter as tk
     from tkinter import ttk,messagebox
     import ctypes
+    import sys
     from pathlib import Path
     try:ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID('pik1.LecturePilot')
     except (AttributeError,OSError):pass
     root=tk.Tk();root.title(TITLE);root.geometry('500x440');root.minsize(480,420)
-    try:root.iconbitmap(str(Path(resources)/'app-icon.ico'))
-    except tk.TclError:pass
-    try:
-        image=tk.PhotoImage(file=str(Path(resources)/'app-icon.png'));root.iconphoto(True,image)
-    except tk.TclError:image=None
+    current_image=[None]
     style=ttk.Style(root);style.theme_use('clam')
     def apply_theme(value):
         dark=value=='dark';bg='#202020' if dark else '#F7F6F3';fg='#F3F2EF' if dark else '#252724';sub='#B7B5AF' if dark else '#666A63';button='#383838' if dark else '#FFFFFF';border='#595959' if dark else '#D2D4CE'
         root.configure(bg=bg)
-        try:
-            suffix='-dark' if dark else ''
-            root.iconbitmap(str(Path(resources)/('app-icon'+suffix+'.ico')))
-            current_image[0]=tk.PhotoImage(file=str(Path(resources)/('app-icon'+suffix+'.png')))
-            root.iconphoto(True,current_image[0])
-        except tk.TclError:pass
+        suffix='-dark' if dark else ''
+        if sys.platform=='win32':
+            # A single large PhotoImage replaces the multi-resolution ICO.
+            # Keep the ICO, so Windows can choose a taskbar-sized image.
+            try: root.iconbitmap(str(Path(resources)/('app-icon'+suffix+'.ico')))
+            except tk.TclError: pass
+        else:
+            try:
+                current_image[0]=tk.PhotoImage(file=str(Path(resources)/('app-icon'+suffix+'.png')))
+                root.iconphoto(True,current_image[0])
+            except tk.TclError: pass
         style.configure('Pilot.TFrame',background=bg)
         style.configure('Pilot.TLabel',background=bg,foreground=fg,font=('Segoe UI',11))
         style.configure('Title.TLabel',background=bg,foreground=fg,font=('Segoe UI',20,'bold'))
@@ -35,7 +37,6 @@ def run(resources, status, open_panel, shutdown, finished, focus_requested, back
             flag=ctypes.c_int(1 if dark else 0)
             ctypes.windll.dwmapi.DwmSetWindowAttribute(root.winfo_id(),20,ctypes.byref(flag),ctypes.sizeof(flag))
         except (AttributeError,OSError,TypeError,ValueError):pass
-    current_image=[image]
     current_theme=[None]
     def sync_theme():
         value=theme()
